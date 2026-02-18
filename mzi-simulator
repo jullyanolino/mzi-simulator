@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Simulador Mach-Zehnder — Comunicação Quântica</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0a192f;
+      color: #e6f1ff;
+      margin: 0;
+      padding: 20px 10px;
+      line-height: 1.6;
+    }
+
+    h1, h2 { color: #64ffda; text-align: center; }
+    .container { max-width: 1100px; margin: 0 auto; }
+
+    /* Abas - usando display block/none direto para maior compatibilidade */
+    .tabs {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin: 30px 0 10px;
+      flex-wrap: wrap;
+    }
+
+    .tab-button {
+      background: #112240;
+      color: #ccd6f6;
+      border: none;
+      padding: 14px 32px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      border-radius: 8px 8px 0 0;
+      cursor: pointer;
+      transition: all 0.25s;
+    }
+
+    .tab-button.active,
+    .tab-button:hover {
+      background: #64ffda;
+      color: #0a192f;
+    }
+
+    .tab-panel {
+      background: #112240;
+      padding: 30px;
+      border-radius: 0 8px 8px 8px;
+      min-height: 500px;
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    canvas {
+      background: #000;
+      border: 1px solid #334;
+      display: block;
+      margin: 20px auto;
+      max-width: 100%;
+      border-radius: 6px;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      justify-content: center;
+      margin: 30px 0;
+    }
+
+    .card {
+      background: #1d3b5e;
+      padding: 24px;
+      border-radius: 10px;
+      min-width: 320px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+    }
+
+    button {
+      background: #64ffda;
+      color: #0a192f;
+      border: none;
+      padding: 12px 24px;
+      margin: 8px 6px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover { background: #4de0c0; }
+
+    input[type=range] { width: 260px; }
+
+	.result {
+	  font-family: monospace;
+	  background: #000;
+	  padding: 16px;
+	  border-radius: 8px;
+	  margin-top: 16px;
+	  white-space: pre-wrap;
+	  max-height: 320px;          /* ou 400px, ajuste conforme preferir */
+	  overflow-y: auto;           /* ativa barra de scroll vertical quando necessário */
+	  border: 1px solid #333;     /* opcional: borda para destacar */
+	}
+    table {
+      border-collapse: collapse;
+      margin: 24px auto;
+      width: 90%;
+      max-width: 700px;
+    }
+
+    th, td {
+      padding: 12px 16px;
+      border: 1px solid #444;
+      text-align: left;
+    }
+
+    th { background: #0a192f; }
+
+    ul { padding-left: 1.6em; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Simulador Interferômetro Mach-Zehnder (MZI)</h1>
+  <p style="text-align:center; color:#aaccff; margin-bottom:40px;">
+    Hands On — Especialização em Comunicação Quântica — SENAI CIMATEC
+  </p>
+
+  <!-- Botões das abas -->
+  <div class="tabs">
+    <button class="tab-button active" data-tab="1">1. Simulador MZI</button>
+    <button class="tab-button" data-tab="2">2. Codificação & Tempo</button>
+    <button class="tab-button" data-tab="3">3. Limites & Melhorias</button>
+  </div>
+
+  <!-- Painel 1 -->
+  <div id="panel1" class="tab-panel active">
+    <h2>Interferômetro Mach-Zehnder Animado</h2>
+    <canvas id="mziCanvas" width="1000" height="580"></canvas>
+
+    <div class="controls">
+      <div class="card">
+        <h3>Controle de Fase φ</h3>
+        <input type="range" id="phaseSlider" min="0" max="360" value="0" step="1"/>
+        <div style="margin:10px 0;">
+          φ = <span id="phaseValue">0</span>°  →  <span id="phaseRad">0.00</span> rad
+        </div>
+        <div>
+          <button onclick="setPhase(0)">φ = 0 rad (bit 0)</button>
+          <button onclick="setPhase(180)">φ = π rad (bit 1)</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Intensidade nas Saídas</h3>
+        <div>D1 (dados): <strong><span id="out1">0%</span></strong></div>
+        <div>D2 (complementar): <strong><span id="out2">100%</span></strong></div>
+        <div style="margin-top:12px;">Conservação: <span id="sum">100%</span> ✓</div>
+      </div>
+    </div>
+
+    <p style="text-align:center; color:#aaa; font-size:0.95em; margin-top:20px;">
+      Demonstração da divisão de amplitude, modulação de fase e interferência.<br>
+      A conservação de energia é sempre 100% (modelo ideal sem perdas).
+    </p>
+  </div>
+
+  <!-- Painel 2 -->
+  <div id="panel2" class="tab-panel">
+    <h2>Codificação da Mensagem (5 bits por caractere)</h2>
+
+    <div class="card" style="max-width:680px; margin:0 auto 30px;">
+      <textarea id="mensagem" rows="5" style="width:100%; padding:12px; font-size:1.1rem;" 
+        placeholder="Digite a mensagem aqui (maiúsculas recomendadas, sem acentos)"></textarea>
+      <div style="text-align:center; margin-top:20px;">
+        <button onclick="codificarMensagem()">Codificar e Calcular Tempo de Transmissão</button>
+      </div>
+      <div id="resultadoCod" class="result"></div>
+    </div>
+
+    <div style="text-align:center;">
+      <h3>Parâmetros do Sistema (baseado no relatório)</h3>
+      <table>
+        <tr><th>Parâmetro</th><th>Valor</th><th>Unidade</th></tr>
+        <tr><td>Comprimento de onda</td><td>1550</td><td>nm</td></tr>
+        <tr><td>Largura de banda do modulador</td><td>40</td><td>GHz</td></tr>
+        <tr><td>Taxa de bits estimada (OOK-NRZ)</td><td>≈ 28</td><td>Gbps</td></tr>
+        <tr><td>Tensão meia-onda (Vπ)</td><td>≈ 3.5</td><td>V</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- Painel 3 -->
+  <div id="panel3" class="tab-panel">
+    <h2>Limites da Transmissão por Fibra Óptica & Melhorias Futuras</h2>
+
+    <div class="card">
+      <h3>Limites Fundamentais</h3>
+      <ul>
+        <li><strong>Capacidade Shannon Clássica</strong>: ≈ 34–66 Tbps/fibra (banda C+L ≈ 10 THz, SNR realista)</li>
+        <li><strong>Limite não-linear (efeito Kerr)</strong>: ≈ 40–100 Tbps/fibra (SPM, XPM, FWM)</li>
+        <li><strong>Atenuação típica</strong>: 0.18 dB/km @ 1550 nm → 1.800 dB em 10.000 km (perda de 10¹⁸⁰!)</li>
+        <li><strong>Amplificação periódica</strong>: EDFA a cada 80–100 km → acumulação de ruído ASE → degradação de OSNR</li>
+      </ul>
+    </div>
+
+    <div class="card" style="margin-top:24px;">
+      <h3>Estratégias e Investigações Futuras</h3>
+      <ul>
+        <li>WDM denso + Polarização (PDM) → multiplicação da capacidade</li>
+        <li>Modulações avançadas: 16/64/256-QAM</li>
+        <li>Fibras de núcleo oco (Hollow-Core Fiber) → menor não-linearidade e latência</li>
+        <li>Multiplexação espacial (SDM): multi-core ou few-mode fibers</li>
+        <li>DSP + FEC avançado (LDPC, polar codes) → aproximação do limite de Shannon</li>
+        <li>Integração fotônica (PIC em Si/InP) + detecção coerente</li>
+        <li>Repetidores quânticos para protocolos QKD</li>
+        <li>Aprendizado de máquina para equalização de não-linearidades</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+// ================================================
+// Controle das abas (JavaScript simples e robusto)
+// ================================================
+document.querySelectorAll('.tab-button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    // Remove active de todos os botões e painéis
+    document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    
+    // Ativa o clicado
+    btn.classList.add('active');
+    const tabId = btn.getAttribute('data-tab');
+    document.getElementById(`panel${tabId}`).classList.add('active');
+  });
+});
+
+// ================================================
+// Simulador MZI
+// ================================================
+const canvas = document.getElementById('mziCanvas');
+const ctx = canvas.getContext('2d');
+
+let phaseDeg = 0;
+let phaseRad = 0;
+let waveOffset = 0;
+const WAVE_SPEED = 0.14;
+
+const dicionario = {
+  ' ':'00000','A':'00001','B':'00010','C':'00011','D':'00100','E':'00101',
+  'F':'00110','G':'00111','H':'01000','I':'01001','J':'01010','K':'01011',
+  'L':'01100','M':'01101','N':'01110','O':'01111','P':'10000','Q':'10001',
+  'R':'10010','S':'10011','T':'10100','U':'10101','V':'10110','W':'10111',
+  'X':'11000','Y':'11001','Z':'11010','!':'11011','.':'11100',',':'11101',
+  '?':'11110','-':'11111'
+};
+
+function setPhase(deg) {
+  phaseDeg = deg;
+  document.getElementById('phaseSlider').value = deg;
+  updateDisplay();
+}
+
+document.getElementById('phaseSlider').addEventListener('input', e => {
+  phaseDeg = +e.target.value;
+  updateDisplay();
+});
+
+function updateDisplay() {
+  phaseRad = phaseDeg * Math.PI / 180;
+  document.getElementById('phaseValue').textContent = phaseDeg;
+  document.getElementById('phaseRad').textContent = phaseRad.toFixed(2);
+
+  const sin2 = Math.sin(phaseRad / 2) ** 2;
+  const cos2 = Math.cos(phaseRad / 2) ** 2;
+
+  document.getElementById('out1').textContent = (sin2 * 100).toFixed(0) + '%';
+  document.getElementById('out2').textContent = (cos2 * 100).toFixed(0) + '%';
+  document.getElementById('sum').textContent = ((sin2 + cos2) * 100).toFixed(0) + '%';
+}
+
+function drawMZI() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const w = canvas.width;
+  const h = canvas.height;
+  const cy = h / 2;
+  const left = 120;
+  const right = w - 180;
+  const bsWidth = 80;
+  const armYoffset = 60;  // distância vertical entre braços
+
+  // Fundo
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(0, 0, w, h);
+
+  // Laser
+  ctx.fillStyle = "#0099ff";
+  ctx.beginPath();
+  ctx.arc(left - 60, cy, 25, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "18px Arial";
+  ctx.fillText("Laser", left - 110, cy - 40);
+
+  // BS1
+  ctx.fillStyle = "#555555";
+  ctx.fillRect(left, cy - 40, bsWidth, 80);
+  ctx.strokeStyle = "#aaaaaa";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(left, cy - 40, bsWidth, 80);
+  ctx.beginPath();
+  ctx.moveTo(left, cy - 40);
+  ctx.lineTo(left + bsWidth, cy + 40);
+  ctx.stroke();
+  ctx.fillStyle = "#00ffff";
+  ctx.font = "bold 22px Arial";
+  ctx.fillText("BS1", left + 20, cy - 55);
+  ctx.fillStyle = "#eeeeee";
+  ctx.font = "16px Arial";
+  ctx.fillText("1", left + 35, cy + 5);
+
+  // Braços
+  ctx.strokeStyle = "#888888";
+  ctx.lineWidth = 4;
+  // Braço superior
+  ctx.beginPath();
+  ctx.moveTo(left + bsWidth, cy - armYoffset);
+  ctx.lineTo(right, cy - armYoffset);
+  ctx.stroke();
+  // Braço inferior
+  ctx.beginPath();
+  ctx.moveTo(left + bsWidth, cy + armYoffset);
+  ctx.lineTo(right, cy + armYoffset);
+  ctx.stroke();
+
+  // Espelho superior (triângulo apontando esquerda)
+  ctx.beginPath();
+  ctx.moveTo(right + 20, cy - armYoffset - 50);
+  ctx.lineTo(right - 60, cy - armYoffset);
+  ctx.lineTo(right + 20, cy - armYoffset + 50);
+  ctx.closePath();
+  ctx.fillStyle = "#666666";
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText("2", right - 30, cy - armYoffset - 15);
+
+  // Espelho inferior
+  ctx.beginPath();
+  ctx.moveTo(right + 20, cy + armYoffset + 50);
+  ctx.lineTo(right - 60, cy + armYoffset);
+  ctx.lineTo(right + 20, cy + armYoffset - 50);
+  ctx.closePath();
+  ctx.fillStyle = "#666666";
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText("3", right - 30, cy + armYoffset + 35);
+
+  // BS2
+  ctx.fillStyle = "#555555";
+  ctx.fillRect(right - bsWidth - 20, cy - 40, bsWidth, 80);
+  ctx.strokeRect(right - bsWidth - 20, cy - 40, bsWidth, 80);
+  ctx.beginPath();
+  ctx.moveTo(right - bsWidth - 20, cy - 40);
+  ctx.lineTo(right - 20, cy + 40);
+  ctx.stroke();
+  ctx.fillStyle = "#00ffff";
+  ctx.font = "bold 22px Arial";
+  ctx.fillText("BS2", right - bsWidth - 5, cy - 55);
+  ctx.fillStyle = "#eeeeee";
+  ctx.font = "16px Arial";
+  ctx.fillText("4", right - bsWidth + 15, cy + 5);
+
+  // Saídas para detectores (para cima e para baixo)
+  ctx.beginPath();
+  ctx.moveTo(right - 20, cy - 25);
+  ctx.lineTo(right + 140, cy - 80);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(right - 20, cy + 25);
+  ctx.lineTo(right + 140, cy + 80);
+  ctx.stroke();
+
+  // Controlador de fase (braço inferior)
+  ctx.fillStyle = "#003366";
+  ctx.fillRect(left + 180, cy + armYoffset - 20, 140, 40);
+  ctx.strokeRect(left + 180, cy + armYoffset - 20, 140, 40);
+  ctx.fillStyle = "#aaffff";
+  ctx.font = "bold 18px Arial";
+  ctx.fillText(`φ = ${phaseDeg}°`, left + 200, cy + armYoffset + 5);
+
+  // Ondas animadas (só nos braços horizontais)
+  waveOffset += 0.07;
+  ctx.lineWidth = 3;
+  const waveAmp = 5;
+  function wave(x1, y, len, phaseExtra) {
+    ctx.strokeStyle = "#00ffcc";
+    for (let i = 0; i < len; i += 12) {
+      let a = Math.sin(i * 0.1 + waveOffset + phaseExtra) * waveAmp;
+      ctx.globalAlpha = 0.6 + Math.abs(a)/ (waveAmp*2);
+      ctx.beginPath();
+      ctx.moveTo(x1 + i, y + a);
+      ctx.lineTo(x1 + i + 6, y + a);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  const waveLen = right - (left + bsWidth);
+  wave(left + bsWidth, cy - armYoffset, waveLen, 0);
+  wave(left + bsWidth, cy + armYoffset, waveLen, phaseRad);
+
+  // Detectores
+  const sin2 = Math.sin(phaseRad / 2) ** 2;
+  const cos2 = Math.cos(phaseRad / 2) ** 2;
+
+  // D1 (superior)
+  ctx.fillStyle = `rgba(255,100,140,${0.4 + sin2*0.6})`;
+  ctx.beginPath();
+  ctx.arc(right + 140, cy - 80, 45 + 20*sin2, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = "#ff4488";
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 20px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("D1", right + 140, cy - 120);
+  ctx.fillText(`${Math.round(sin2*100)}%`, right + 140, cy - 60);
+
+  // D2 (inferior)
+  ctx.fillStyle = `rgba(100,255,180,${0.4 + cos2*0.6})`;
+  ctx.beginPath();
+  ctx.arc(right + 140, cy + 80, 45 + 20*cos2, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = "#44ff88";
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText("D2", right + 140, cy + 130);
+  ctx.fillText(`${Math.round(cos2*100)}%`, right + 140, cy + 100);
+
+  requestAnimationFrame(drawMZI);
+}
+
+
+drawMZI();
+updateDisplay();
+
+// ================================================
+// Codificação
+// ================================================
+function normalizarTexto(txt) {
+  return txt.toUpperCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Z !?.,-]/g, "");
+}
+
+function codificarMensagem() {
+  const msg = document.getElementById('mensagem').value.trim();
+  if (!msg) {
+    alert("Digite uma mensagem para codificar.");
+    return;
+  }
+
+  const normal = normalizarTexto(msg);
+  let linhas = [];
+  let nBits = 0;
+
+  for (let char of normal) {
+    const code = dicionario[char] || "?????";
+    linhas.push(`${char} → ${code}`);
+    nBits += 5;
+  }
+
+  const tempo_s = nBits / 28e9;
+  let tempo_str = "";
+  if (tempo_s < 1e-6)      tempo_str = (tempo_s * 1e9).toFixed(1) + " ns";
+  else if (tempo_s < 1e-3) tempo_str = (tempo_s * 1e6).toFixed(2) + " μs";
+  else                     tempo_str = tempo_s.toFixed(3) + " s";
+
+  let html = `<strong>Mensagem (${normal.length} caracteres):</strong><br>${normal || "(vazia)"}<br><br>`;
+  html += `<strong>Total de bits:</strong> ${nBits} bits<br>`;
+  html += `<strong>Tempo estimado @ 28 Gbps:</strong> ${tempo_str}<br><br>`;
+  html += `<strong>Codificação detalhada:</strong><br><div style="columns:3; font-size:0.95em;">${linhas.join("<br>")}</div>`;
+
+  document.getElementById('resultadoCod').innerHTML = html;
+}
+</script>
+</body>
+</html>
